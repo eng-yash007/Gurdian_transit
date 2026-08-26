@@ -10,6 +10,7 @@ from app.models.user import User
 from app.models.attendance import Attendance
 from app.models.student import Student
 from app.schemas.attendance import AttendanceCreate, AttendanceResponse
+from app.services.attendance_engine import AttendanceEngine
 
 router = APIRouter()
 
@@ -62,20 +63,13 @@ async def create_manual_attendance(
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
 
-    attendance = Attendance(
+    # Use Attendance Engine to process event and generate alerts/notifications
+    attendance = await AttendanceEngine.process_attendance_event(
+        db=db,
         student_id=attendance_in.student_id,
         bus_id=attendance_in.bus_id,
         event_type=attendance_in.event_type,
-        verification_method="MANUAL_OVERRIDE", # Mock event
-        latitude=attendance_in.latitude,
-        longitude=attendance_in.longitude
+        verification_method="MANUAL_OVERRIDE"
     )
-    
-    # Update current status on student record
-    student.current_status = attendance_in.event_type
-    
-    db.add(attendance)
-    await db.commit()
-    await db.refresh(attendance)
     
     return attendance
