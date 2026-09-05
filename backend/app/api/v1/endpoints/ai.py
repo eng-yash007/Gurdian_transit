@@ -16,9 +16,9 @@ from app.services.attendance_engine import AttendanceEngine
 
 router = APIRouter()
 
-# Strict threshold for Euclidean Distance (L2) using ArcFace
-# Typically for ArcFace, < 1.0 is the same person, but 0.6 is a strict cutoff
-MATCH_THRESHOLD = 0.68 
+# ArcFace usually requires Cosine Distance for robust matching.
+# Cosine distance < 0.40 is generally a solid match for ArcFace.
+MATCH_THRESHOLD = 0.40 
 
 @router.post("/register")
 async def register_face(
@@ -36,8 +36,7 @@ async def register_face(
         
     # Check student exists
     result = await db.execute(select(Student).where(Student.id == student_id))
-    student = result.scalars().first()
-    if not student:
+    if not result.scalars().first():
         raise HTTPException(status_code=404, detail="Student not found")
         
     image_bytes = await file.read()
@@ -85,10 +84,10 @@ async def recognize_face(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
         
-    # pgvector L2 distance search (<-> operator)
+    # pgvector Cosine distance search (<=> operator)
     # Order by distance, get the closest one
     result = await db.execute(
-        select(FaceProfile, FaceProfile.embedding.l2_distance(live_embedding).label("distance"))
+        select(FaceProfile, FaceProfile.embedding.cosine_distance(live_embedding).label("distance"))
         .order_by("distance")
         .limit(1)
     )

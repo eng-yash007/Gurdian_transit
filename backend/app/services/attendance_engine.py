@@ -8,6 +8,8 @@ from app.models.student import Student
 from app.models.fleet import BusAssignment
 from app.models.telemetry import Notification, Alert
 
+from sqlalchemy.orm import selectinload
+
 class AttendanceEngine:
     @staticmethod
     async def process_attendance_event(
@@ -22,7 +24,11 @@ class AttendanceEngine:
         Core business logic for recording attendance, updating state, and triggering alerts.
         """
         # 1. Fetch Student
-        result = await db.execute(select(Student).where(Student.id == student_id))
+        result = await db.execute(
+            select(Student)
+            .options(selectinload(Student.parent))
+            .where(Student.id == student_id)
+        )
         student = result.scalars().first()
         if not student:
             raise ValueError("Student not found")
