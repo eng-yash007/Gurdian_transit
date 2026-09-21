@@ -1,0 +1,4 @@
+opencv-python
+numpy
+pydantic>=2.0
+pytest
