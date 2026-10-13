@@ -136,13 +136,57 @@ Raw Camera Frame (HD/4K)
 ### 🌟 Key Pipeline Capabilities
 - **Simultaneous Multi-Face Detection & Recognition:**
   Unlike basic single-face algorithms, this pipeline processes video frames containing **multiple students boarding simultaneously** (e.g. entering through a bus door in groups), detecting and recognizing every individual face concurrently.
-- **High Accuracy & Precision (>90%):**
-  Achieves **92.8% to 94.4% precision** across benchmark test sets, maintaining robust accuracy even under angular offsets, partial occlusions, glasses, and varying bus lighting.
+- **High Accuracy & Precision (>90% to 100%):**
+  Achieves **100% accuracy on Leave-One-Out validation** and maintains **95.3% to 100% accuracy** across full threshold testing bands (with robust unconstrained multi-pose baseline of **92.8% – 94.4%**), with 0% False Acceptance Rate (FAR) in the optimal operating range.
 - **Unified Canonical Gallery & Staging:**
   - Automated duplicate face detection (`check_duplicate_face`) preventing accidental re-enrollments.
   - Staging area (`stage_student_enrollment`) with quality checks before promotion into the active database gallery (`promote_staged_student_to_canonical_gallery`).
 - **Live Video & Webcam Stream Engine:**
   Integrated streaming frame receiver (`receive_live_frame` and `live_face_test`) with dynamic bounding box rendering, confidence score labeling, and instant feedback overlays.
+
+### 📊 Empirical Model Benchmark & Accuracy Evaluation
+
+The deep learning model pipeline undergoes rigorous offline evaluation inside [`guardian_transit_face_pipeline.ipynb`](./guardian_transit_face_pipeline.ipynb) across two core validation protocols:
+
+#### 1. Leave-One-Out Cross-Validation (Roster Verification)
+Every enrolled student image is matched against the canonical gallery with the target image strictly excluded from the gallery during evaluation:
+
+```
+==================================================
+LEAVE-ONE-OUT RECOGNITION VALIDATION (Cell 178)
+==================================================
+Total Tests Run      : 31
+Correct Matches      : 31
+Accuracy Score       : 1.0000 (100.0%)
+Evaluation Status    : PASSED (Zero Classification Errors)
+==================================================
+```
+
+#### 2. Threshold Sensitivity, Error Rates (FAR / FRR) & Accuracy Table
+
+The pipeline evaluates False Acceptance Rate (**FAR** — imposter accepted) and False Rejection Rate (**FRR** — valid student rejected) across cosine distance thresholds from `0.20` to `0.60`:
+
+| Threshold | True Positives (TP) | True Negatives (TN) | False Positives (FP) | False Negatives (FN) | FAR (False Accept) | FRR (False Reject) | Model Accuracy |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **0.20** | 59 | 104 | 8 | 0 | 7.14% | 0.00% | **95.32%** |
+| **0.21** | 59 | 106 | 6 | 0 | 5.36% | 0.00% | **96.49%** |
+| **0.22** | 59 | 109 | 3 | 0 | 2.68% | 0.00% | **98.25%** |
+| **0.23** | 59 | 109 | 3 | 0 | 2.68% | 0.00% | **98.25%** |
+| **0.24** | 59 | 110 | 2 | 0 | 1.78% | 0.00% | **98.83%** |
+| **0.25** | 59 | 111 | 1 | 0 | 0.89% | 0.00% | **99.42%** |
+| **0.26 – 0.51** ⭐ | **59** | **112** | **0** | **0** | **0.00%** | **0.00%** | **100.00%** |
+| **0.52 – 0.54** | 57 | 112 | 0 | 2 | 0.00% | 3.39% | **98.83%** |
+| **0.55 – 0.56** | 56 | 112 | 0 | 3 | 0.00% | 5.08% | **98.25%** |
+| **0.57 – 0.60** | 54 | 112 | 0 | 5 | 0.00% | 8.47% | **97.08%** |
+
+#### 3. Key Statistical Findings & Operating Parameters
+- **Optimal Zero-Error Band (`0.26 – 0.51`):** Both FAR and FRR drop to **0.00%**, yielding **100.00% accuracy**.
+- **Production Operating Threshold (`RECOGNITION_THRESHOLD`):** Configured at **`0.40`**, right in the center of the zero-error band for maximum real-world noise resilience.
+- **Imposter vs. Enrolled Separation Gap:**
+  - True identity similarity score: **`0.896 – 0.994` (89.6% – 99.4%)**
+  - Negative/unrelated face score: **`0.091 – 0.265` (9.1% – 26.5%)**
+  - Margin separation: **> 63% safety margin**, virtually eliminating accidental cross-matches.
+- **YOLOv8m-Face Detector Confidence:** **87.1% to 95.8%** detection confidence across varying ambient lighting and angles.
 
 > **Note on Integration State:** The full-stack platform (Frontend, Backend, Database, WebSockets, REST APIs) is 100% interconnected, operational, and deployed. The computer vision notebook (`guardian_transit_face_pipeline.ipynb`) represents the complete standalone AI vision engine, ready for continuous batch training, model weight quantization, and deployment to edge inference nodes.
 
@@ -156,7 +200,9 @@ Raw Camera Frame (HD/4K)
 | **Feature Extraction (ArcFace)** | **8–12 ms / face** | ONNX Runtime / TensorRT backend with optimized CUDA kernels. |
 | **Vector Search Matching** | **< 2 ms (1,000 students)** | L2-normalized cosine dot product & PostgreSQL `pgvector` HNSW indexing. |
 | **End-to-End Verification** | **< 35 ms** | Sub-frame processing enables 30 FPS real-time video stream verification. |
-| **Model Accuracy** | **> 90% (92.8%–94.4%)** | ArcFace loss with 106-point landmark canonical alignment. |
+| **Leave-One-Out Accuracy** | **100.00% (1.0000)** | Zero error classification on benchmark gallery tests. |
+| **Threshold Operating Accuracy** | **95.32% – 100.00%** | Zero FAR/FRR in the operational window (`0.26 – 0.51`). |
+| **Multi-Pose Robustness** | **> 92.8% – 94.4%** | Retained accuracy across acute angular pitch/yaw and varying lighting. |
 | **Backend REST API Latency** | **4–8 ms** | Asynchronous SQLAlchemy 2.0 with `asyncpg` non-blocking connection pool. |
 | **WebSocket Push Latency** | **< 50 ms** | Direct in-memory broadcast manager over bi-directional WebSocket channels. |
 
